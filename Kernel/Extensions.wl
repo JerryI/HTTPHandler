@@ -73,7 +73,7 @@ FileNameToURLPath[fileName_String] :=
 URLBuild[FileNameSplit[StringTrim[fileName, StartOfString ~~ Directory[]]]]; 
 
 
-Options[ImportFile] = {"Base" :> {Directory[]}, "StringOutput"->False}
+Options[ImportFile] = {"Base" :> {Directory[]}, "StringOutput"->False, "RequestPath" -> "", "Routes" -> <||>}
 Options[importFile] = Options[ImportFile]
 
 importFile[path_String, opts:OptionsPattern[]] := With[{body = ReadByteArray[path]},
@@ -94,18 +94,42 @@ importFile[path_String, opts:OptionsPattern[]] := With[{body = ReadByteArray[pat
       ] 
     ]
 
-ImportFile[file_String, opts:OptionsPattern[]] := Module[{paths = Flatten[OptionValue["Base"]]},
+ImportFile[file_String, opts:OptionsPattern[]] := Module[{
+    paths = Flatten[OptionValue["Base"]], 
+    raw = OptionValue["RequestPath"], 
+    routes = OptionValue["Routes"]
+},
     
     With[{path = FileNameJoin[{#, file}]},
+     Echo["HTTPHandler >> Checking "<>path<>"..."];
      If[
-         Print["Checking "<>path<>"..."];
          FileExistsQ[path]
      ,
          Return[importFile[path, opts], Module]
      ]
     ] &/@ paths;
 
-    Print["file "<>file<>" was not found ;()"];
+
+    With[{
+        splitted = FileNameSplit[StringTrim[raw // URLDecode, "/"] ]
+    },{
+        route = SelectFirst[routes//Keys, MatchQ[splitted, #]&]
+    },
+
+        If[!MissingQ[route],
+            Echo["HTTPHandler >> Checking route "<>ToString[route]<>"..."];
+            With[{
+                resolved = FileNameJoin[{Key[route][routes], Drop[splitted, Length[route]-1]} // Flatten]
+            },
+                Echo["HTTPHandler >> Resolved to: "<>resolved];
+                If[FileExistsQ[resolved],
+                    Return[importFile[resolved, opts], Module];
+                ];
+            ]
+        ];
+    ];
+
+    Echo["HTTPHandler >> File "<>file<>" was not found ;()"];
 
     <|"Code" -> 404|>
 ]
@@ -113,7 +137,7 @@ ImportFile[file_String, opts:OptionsPattern[]] := Module[{paths = Flatten[Option
 
 
 ImportFile[request_Association, opts: OptionsPattern[]] := 
-ImportFile[URLPathToFileName[request["Path"]], opts]
+ImportFile[URLPathToFileName[request["Path"]], "RequestPath"->request["Path"], opts]
 
 
 ImportFileAsText = ImportFile
