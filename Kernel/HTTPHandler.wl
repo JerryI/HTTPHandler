@@ -215,24 +215,20 @@ createResponse[assoc_Association, serializer_] :=
 Module[{response = assoc, body, headers}, 
 	body = ConditionApply[serializer, $serializer][response["Body"]]; 
 
+	If[StringQ[body], body = StringToByteArray[body]];
 
 	If[Not[KeyExistsQ[response, "Message"]], response["Message"] = "OK"]; 
-	If[Not[KeyExistsQ[response, "Headers"]], response["Headers"] = <|
-		"Content-Length" -> If[StringQ[body], StringLength[body], Length[body]]
-	|>];  
+	If[Not[KeyExistsQ[response, "Headers"]], 
+		response["Headers"] = <|
+		"Content-Length" -> Length[body]
+		|>
+	];  
 
 	(*Return: ByteArray[]*)
-	If[StringQ[body],
-		StringToByteArray[StringTemplate["HTTP/1.1 `Code` `Message`\r\n"][response] <> 
-		StringRiffle[KeyValueMap[StringRiffle[{#1, ToString[#2]}, ": "]&] @ response["Headers"], "\r\n"] <> 
-		"\r\n\r\n" <> 
-		body]	
-	,
-		Join[StringToByteArray[StringTemplate["HTTP/1.1 `Code` `Message`\r\n"][response] <> 
+	Join[StringToByteArray[StringTemplate["HTTP/1.1 `Code` `Message`\r\n"][response] <> 
 		StringRiffle[KeyValueMap[StringRiffle[{#1, ToString[#2]}, ": "]&] @ response["Headers"], "\r\n"] <> 
 		"\r\n\r\n"],
-		body]		
-	]
+		body]
 
 ]; 
 
